@@ -1,13 +1,12 @@
+from difflib import SequenceMatcher
+
 import emnist
 import string
 import numpy as np
-
 from tensorflow.keras import layers
 from tensorflow import keras
 
 import global_params as gp
-
-import matplotlib.pyplot as plt
 
 
 def _load_emnist_data():
@@ -43,15 +42,14 @@ def _train_model(X_train, y_train, epochs):
                               layers.Dense(gp.NUM_CLASSES, activation="softmax")])
                     
     model.compile(loss="categorical_crossentropy", optimizer="adam", metrics=["accuracy"])
-    history = model.fit(X_train, y_train, batch_size=gp.BATCH_SIZE, epochs=epochs, validation_split=0.1)
+    _ = model.fit(X_train, y_train, batch_size=gp.BATCH_SIZE, epochs=epochs, validation_split=0.1)
 
     model.save("model.keras")
 
     return model
 
 
-
-def get_model(retrain=False, epochs=15, evaluation_metrics=True):
+def get_model(retrain=False, epochs=15, evaluation_metrics=False):
     X_train, X_test, y_train, y_test = _load_emnist_data()
 
     if retrain:
@@ -66,10 +64,57 @@ def get_model(retrain=False, epochs=15, evaluation_metrics=True):
     return model
 
 
-def decode_prediction(prediction):
+def similar(a, b):
+    return 100 * SequenceMatcher(None, a, b).ratio()
+
+
+def transform_string(input_str):
+    input_str = input_str.upper()
+    
+    def _convert_char(char):
+        if char in gp.CHAR_MAPPING:
+            return gp.CHAR_MAPPING[char]
+        else:
+            return char
+
+    output_list = [_convert_char(char) for char in input_str]
+
+    output_str = "".join(output_list)
+
+    return output_str
+
+
+def crop_image(img, centroid):
+    centroid = [round(x) for x in centroid]
+    left = round(centroid[1] - gp.IMG_SIZE/2)
+    right = round(centroid[1] + gp.IMG_SIZE/2)
+    top = round(centroid[0] - gp.IMG_SIZE/2)
+    bottom = round(centroid[0] + gp.IMG_SIZE/2)
+    img_slice = img[left:right, top:bottom]
+
+    return img_slice
+
+
+def _decode_prediction(prediction):
     possible_values = [str(x) for x in range(10)] + list(string.ascii_lowercase) + list(string.ascii_uppercase)
     decode_prediction_dict = dict(zip(range(gp.NUM_CLASSES), possible_values))
 
     value = np.argmax(prediction)
 
     return decode_prediction_dict[value]
+
+
+def img_to_prediction(cropped_image, model, verbose=False):
+    cropped_image_expanded = np.expand_dims(cropped_image, axis=0)
+
+    if cropped_image_expanded.shape != (1, gp.IMG_SIZE, gp.IMG_SIZE):
+        return None
+
+    encoded_prediction = model.predict(cropped_image_expanded)
+    prediction = _decode_prediction(encoded_prediction)
+    
+    if verbose:
+        print("\nConfidence:", np.max(encoded_prediction))
+        print("Predicted value:", prediction)
+
+    return prediction 
