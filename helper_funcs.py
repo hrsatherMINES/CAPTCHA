@@ -7,16 +7,23 @@ from tensorflow import keras
 
 import global_params as gp
 
+import matplotlib.pyplot as plt
+
 
 def _load_emnist_data():
     X_train, y_train = emnist.extract_training_samples("byclass")
     X_test, y_test = emnist.extract_test_samples("byclass")
 
     X_train = X_train.astype("float32") / 255
+    X_train[X_train >= gp.PIXEL_THRESH] = 1
+    X_train[X_train < gp.PIXEL_THRESH] = 0
     X_train = np.expand_dims(X_train, -1)
-    X_test = X_test.astype("float32") / 255
-    X_test = np.expand_dims(X_test, -1)
 
+    X_test = X_test.astype("float32") / 255
+    X_test[X_test >= gp.PIXEL_THRESH] = 1
+    X_test[X_test < gp.PIXEL_THRESH] = 0
+    X_test = np.expand_dims(X_test, -1)
+    
     y_train = keras.utils.to_categorical(y_train, gp.NUM_CLASSES)
     y_test = keras.utils.to_categorical(y_test, gp.NUM_CLASSES)
 
@@ -64,4 +71,5 @@ def decode_prediction(prediction):
     decode_prediction_dict = dict(zip(range(gp.NUM_CLASSES), possible_values))
 
     value = np.argmax(prediction)
+
     return decode_prediction_dict[value]
