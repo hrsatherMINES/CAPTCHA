@@ -1,8 +1,10 @@
+import string
 from difflib import SequenceMatcher
 
+import cv2
 import emnist
-import string
 import numpy as np
+import matplotlib.pyplot as plt
 from tensorflow.keras import layers
 from tensorflow import keras
 
@@ -29,7 +31,7 @@ def _load_emnist_data():
     return (X_train, X_test, y_train, y_test)
 
 
-def _train_model(X_train, y_train, epochs):
+def _train_model(X_train, y_train, epochs, visualize):
     input_shape = (gp.IMG_SIZE, gp.IMG_SIZE, 1)
 
     model = keras.Sequential([keras.Input(shape=input_shape),
@@ -42,7 +44,16 @@ def _train_model(X_train, y_train, epochs):
                               layers.Dense(gp.NUM_CLASSES, activation="softmax")])
                     
     model.compile(loss="categorical_crossentropy", optimizer="adam", metrics=["accuracy"])
-    _ = model.fit(X_train, y_train, batch_size=gp.BATCH_SIZE, epochs=epochs, validation_split=0.1)
+    history = model.fit(X_train, y_train, batch_size=gp.BATCH_SIZE, epochs=epochs, validation_split=0.1)
+
+    if visualize:
+        plt.plot(history.history['accuracy'])
+        plt.plot(history.history['val_accuracy'])
+        plt.title('model accuracy')
+        plt.ylabel('accuracy')
+        plt.xlabel('epoch')
+        plt.legend(['train', 'test'], loc='upper left')
+        plt.show()
 
     model.save("model.keras")
 
@@ -53,7 +64,7 @@ def get_model(retrain=False, epochs=15, evaluation_metrics=False):
     X_train, X_test, y_train, y_test = _load_emnist_data()
 
     if retrain:
-        model = _train_model(X_train, y_train, epochs)
+        model = _train_model(X_train, y_train, epochs, evaluation_metrics)
     else:
         model = keras.models.load_model("model.keras")
 
@@ -118,3 +129,31 @@ def img_to_prediction(cropped_image, model, verbose=False):
         print("Predicted value:", prediction)
 
     return prediction 
+
+
+def sort_preds(x_loc_list, prediction_list):
+    zipped_lists = zip(x_loc_list, prediction_list)
+    sorted_pairs = sorted(zipped_lists)
+
+    sorted_pairs = zip(*sorted_pairs)
+    _, output = (list(pair) for pair in sorted_pairs)
+    sorted_prediction = "".join(output)
+
+    return sorted_prediction
+
+
+def process_captcha(img):
+    # Invert color
+    img = 255 - img
+    # Take the max of each band
+    img = np.max(img, axis=2)
+    # Denoise
+    img = cv2.fastNlMeansDenoising(img, None, 10, 3, 27) # have to denoise it before dividing by 255
+    img = 255 - img
+    # Threshold
+    img = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 7, 2)
+    img = 255 - img
+    img = cv2.blur(img, (3,3))
+    _, img = cv2.threshold(img, 150, 255, cv2.THRESH_BINARY)
+
+    return img

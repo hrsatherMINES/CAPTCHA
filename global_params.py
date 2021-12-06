@@ -4,6 +4,7 @@ BATCH_SIZE = 128
 NUM_CLASSES = 62
 IMG_SIZE = 28
 PIXEL_THRESH = 0.30
+MIN_AREA = 40
 CHAR_MAPPING = {"J": "I",
                 "L": "I",
                 "1": "I",
