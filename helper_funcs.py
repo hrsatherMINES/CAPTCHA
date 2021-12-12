@@ -95,7 +95,7 @@ def transform_string(input_str):
     return output_str
 
 
-def crop_image(img, centroid):
+def _crop_image(img, centroid):
     centroid = [round(x) for x in centroid]
     left = round(centroid[1] - gp.IMG_SIZE/2)
     right = round(centroid[1] + gp.IMG_SIZE/2)
@@ -115,7 +115,7 @@ def _decode_prediction(prediction):
     return decode_prediction_dict[value]
 
 
-def img_to_prediction(cropped_image, model, verbose=False):
+def _img_to_prediction(cropped_image, model, verbose=False):
     cropped_image_expanded = np.expand_dims(cropped_image, axis=0)
 
     if cropped_image_expanded.shape != (1, gp.IMG_SIZE, gp.IMG_SIZE):
@@ -131,7 +131,7 @@ def img_to_prediction(cropped_image, model, verbose=False):
     return prediction 
 
 
-def sort_preds(x_loc_list, prediction_list):
+def _sort_preds(x_loc_list, prediction_list):
     zipped_lists = zip(x_loc_list, prediction_list)
     sorted_pairs = sorted(zipped_lists)
 
@@ -142,7 +142,7 @@ def sort_preds(x_loc_list, prediction_list):
     return sorted_prediction
 
 
-def process_captcha(img):
+def _process_captcha(img):
     # Invert color
     img = 255 - img
     # Take the max of each band
@@ -157,3 +157,42 @@ def process_captcha(img):
     _, img = cv2.threshold(img, 150, 255, cv2.THRESH_BINARY)
 
     return img
+
+
+def read_captcha(img, model):
+    img = _process_captcha(img)
+
+    # Find connected components
+    num_components, _, stats, centroids = cv2.connectedComponentsWithStats(img, 1, cv2.CV_8U)
+    #This section gets rid of small component areas
+    temp_components = 0
+    temp_centroids = []
+    for i in range(len(stats)):
+        if stats[i][4] > gp.MIN_AREA:
+            temp_components +=1
+            temp_centroids.append(centroids[i])
+    centroids = temp_centroids
+    num_components = temp_components
+
+    # Normalize
+    img = img / 255
+    img[img >= gp.PIXEL_THRESH] = 1
+    img[img < gp.PIXEL_THRESH] = 0
+
+    x_loc_list = []
+    prediction_list = []
+    for i in range(1, num_components):
+        centroid = centroids[i]
+
+        cropped_image = _crop_image(img, centroid)
+       
+        prediction = _img_to_prediction(cropped_image, model, verbose=False)
+        if prediction is None:  # One of the images is messed up
+            continue
+
+        x_loc_list.append(centroid[0])
+        prediction_list.append(prediction)
+
+        prediction = _sort_preds(x_loc_list, prediction_list)
+
+    return prediction
