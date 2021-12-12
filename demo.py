@@ -8,6 +8,12 @@ import helper_funcs as hf
 
 
 def predict(image, model):
+    """ Params:
+            image: The image to perform the prediciton on.
+            model: The model that performs the prediction.
+        Returns:
+            The prediction that the model performs on the image of the read CAPTCHA"""
+            
     predicted_captcha = hf.read_captcha(image, model)
     predicted_captcha = hf.transform_string(predicted_captcha)
     return predicted_captcha
