@@ -22,7 +22,7 @@ def main():
     # Load image
     file_name = args.file_name
     img = cv2.imread(file_name)
-
+    
     # Load model
     print("Loading model...")
     model = hf.get_model(retrain=False)
@@ -30,6 +30,10 @@ def main():
 
     predicted_captcha = predict(img, model)
     print("Prediction:", predicted_captcha)
+
+    # Show image
+    plt.imshow(img)
+    plt.show()
 
 
 if __name__ == "__main__":
